@@ -1,0 +1,62 @@
+NATinstance
+===========
+
+Allows your private instances outgoing connectivity to the internet while at the same time blocking inbound traffic from the internet
+
+Step-1
+
+Create ec2 instance using nat ami(NAT instance)
+amzn-ami-vpc-nat-2018.03.0.20220209.2-x86_64-ebs
+
+Step 2 
+
+Allow the vpc and attach the public subnet
+
+Step-3
+Allow the security group 
+10.0.0.0/16
+port 22
+port 80
+port 443
+
+all icmp 
+
+Step -4
+
+Edit the nat instace network settings and change the source and destination checks
+
+Step -5
+Go to route tables and edit the routs on pravite subnet and attach the nat ec2instance
+
+Step -6
+
+Try to access the internat websits
+
+
+NATGateway
+==================
+
+A NAT gateway is a Network Address Translation (NAT) service. You can use a NAT gateway so that instances in a private subnet can connect to services outside your VPC but external services cannot initiate a connection with those instances.
+
+
+Delete the nat instance
+
+Step -1
+
+Create the natgateway 
+Step -2
+
+Allow the public subnet
+
+Step -3
+
+Allocate the elestic ip
+
+Step -4
+
+Go to routes and edit the pravite routs and attach the nategateway
+
+Step -5
+
+Try to access internet pravite servers
+

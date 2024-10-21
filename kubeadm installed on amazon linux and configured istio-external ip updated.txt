@@ -1,0 +1,346 @@
+Prerequisites
+A compatible Linux hosts: 2 GB or more of RAM per machine and 2 CPUs or more
+3 - Ubuntu 20.04 LTS Serves: 1x Manager (4GB RAM, 2 vCPU)t2.medium type, 2x Workers (1 GB, 1 Core) t2.micro type
+Full network connectivity between all machines in the cluster
+binaries
+
+Kubernetes cluster Setup on AWS amazon ec2 Using Kubeadm 
+
+Unique hostname for each host. Change hostname of the machines using hostnamectl. 
+
+Step1
+CERTAIN PORTS ARE OPEN ON YOUR MACHINES(HTTPS://KUBERNETES.IO/DOCS/REFERENCE/PORTS-AND-PROTOCOLS/)
+
+ON MASTER NODE
+
+6443/TCP FOR KUBERNETES API SERVER
+2379-2380 FOR ETCD SERVER CLIENT API
+6783/TCP,6784/UDP FOR WEAVENET CNI
+10248-10260 FOR KUBELET API, KUBE-SCHEDULER, KUBE-CONTROLLER-MANAGER, READ-ONLY KUBELET API, KUBELET HEALTH
+80,8080,443 GENERIC PORTS
+30000-32767 FOR NODEPORT SERVICES
+
+ON SLAVE NODES
+6783/TCP,6784/UDP FOR WEAVENET CNI
+10248-10260 FOR KUBELET API ETC
+30000-32767 FOR NODEPORT SERVICES
+portrange
+
+RUN ON ALL NODES OF THE CLUSTER AS ROOT USER
+
+hostnamectl set-hostname slave
+
+Step -2
+=========
+DISABLE SWAP
+YOU MUST DISABLE SWAP IN ORDER FOR THE KUBELET TO WORK PROPERLY
+
+  swapoff -a
+  sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+Step:-3
+=============
+INSTALL CONTAINERD
+
+  wget https://github.com/containerd/containerd/releases/download/v1.6.16/containerd-1.6.16-linux-amd64.tar.gz
+  tar Cxzvf /usr/local containerd-1.6.16-linux-amd64.tar.gz
+  wget https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+  mkdir -p /usr/local/lib/systemd/system
+  mv containerd.service /usr/local/lib/systemd/system/containerd.service
+  systemctl daemon-reload
+  systemctl enable --now containerd
+
+Step:-4
+===========
+INSTALL RUNC
+
+
+  wget https://github.com/opencontainers/runc/releases/download/v1.1.4/runc.amd64
+  install -m 755 runc.amd64 /usr/local/sbin/runc
+
+Step:-5
+================
+Install CNI
+
+
+  wget https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-amd64-v1.2.0.tgz
+  mkdir -p /opt/cni/bin
+  tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.2.0.tgz
+
+Step:-6
+=================
+Install CRICTL
+
+  VERSION="v1.26.0" # check latest version in /releases page
+  wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION/crictl-$VERSION-linux-amd64.tar.gz
+  sudo tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/local/bin
+  rm -f crictl-$VERSION-linux-amd64.tar.gz
+cat <<EOF | sudo tee /etc/crictl.yaml
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 2
+debug: false
+pull-image-on-create: false
+EOF
+
+Step:-7
+================
+Forwarding IPv4 and letting iptables see bridged traffic
+https://kubernetes.io/docs/setup/production-environment/container-runtimes/#forwarding-ipv4-and-letting-iptables-see-bridged-traffic
+
+
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+
+ sudo modprobe overlay
+ sudo modprobe br_netfilter
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sudo sysctl --system
+sysctl net.bridge.bridge-nf-call-iptables net.bridge.bridge-nf-call-ip6tables net.ipv4.ip_forward
+modprobe br_netfilter
+sysctl -p /etc/sysctl.conf
+
+Step:-8
+==================
+Install kubectl, kubelet and kubeadm
+
+USE UBUNTU OS
+#yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+#yum install install -y apt-transport-https curl
+#curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+Use AMAZON linux os
+
+yum install docker -y
+systemctl enable docker
+systemctl start docker
+
+CREATE PROPER YUM REPO FILES SO THAT WE CAN USE YUM COMMANDS TO INSTALL THE COMPONENTS OF KUBERNETES.
+
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+
+name=Kubernetes
+
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+
+enabled=1
+
+gpgcheck=1
+
+repo_gpgcheck=0
+
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+exclude=kube*
+
+EOF
+
+SYSCTL COMMAND IS USED TO MODIFY KERNEL PARAMETERS AT RUNTIME. KUBERNETES NEEDS TO HAVE ACCESS TO KERNEL’S IP6 TABLE AND SO WE NEED TO DO SOME MORE MODIFICATIONS. THIS INCLUDES DISABLING SECURE Linux.
+
+cat <<EOF >  /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+
+sysctl --system
+setenforce 0
+yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+systemctl enable kubelet
+systemctl start kubelet
+systemctl start kubelet
+
+Step:-9
+====================
+RUN ON MASTER NODE AND FOLLOW THE INSTRUCTIONS
+
+
+kubeadm config images pull
+kubeadm init
+
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+kubectl get nodes
+
+Step:-10
+=============================
+Install any CNI plugin. We will use weavenet
+
+
+kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+
+Step:-11
+================
+workernodes join
+
+Use your token to join the your worker nodes
+
+kubectl get nodes
+export KUBECONFIG=/etc/kubernetes/admin.conf
+kubectl get nodes
+kubectl get nodes -o wide
+
+RUN DEMO APPLICATION
+
+kubectl run nginx --image=nginx --port=80 
+kubectl expose pod nginx --port=80 --type=NodePort
+
+
+kubeadm join 172.31.85.82:6443 --token rpt646.ol1zwlaa4vwhxhy2 \
+        --discovery-token-ca-cert-hash sha256:c64ea096f2e5918ffcfc9a992e08e17afe73063a7dbb2d52b0070120c1fd888f
+		
+		https://172.31.87.57:6443
+		
+		https://youtu.be/5aUw_m8d14w
+
+kubeadm join 172.31.10.79:6443 --token qtmfsx.npzriq9wrqlkjyks \
+        --discovery-token-ca-cert-hash sha256:42a66f6b7b4008fd2eb9f8519d4c2e585cff44a4f5127d19f6a3a601bdef477d
+		
+		10.0.0.0/24
+		10.0.1.0/24
+		10.0.16.0/20
+		10.0.32.0/20
+		
+=====================================================================
+Step:-1
+=========
+Istio
+Install istioctl
+
+curl -L https://istio.io/downloadIstio | sh -
+cd istio-1.9.2
+export PATH=$PWD/bin:$PATH
+
+Step:-2
+===================
+Deploy the Istio operator
+$ istioctl operator init
+
+Installing operator controller in namespace: istio-operator using image: docker.io/istio/operator:1.9.2
+Operator controller will watch namespaces: istio-system
+✔ Istio operator installed
+✔ Installation complete
+
+Step:-3
+===========
+Install Istio
+
+$ kubectl create ns istio-system
+namespace/istio-system created
+
+$ kubectl apply -f - <<EOF
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  namespace: istio-system
+  name: example-istiocontrolplane
+spec:
+  profile: default
+EOF
+
+output
+-------
+istiooperator.install.istio.io/example-istiocontrolplane created
+
+Step:-4
+==========
+Confirm that all of the pods are running with the following command.
+
+$ kubectl get pod -n istio-system -w
+
+Step:-5
+=============
+istio ingress gateway EXTERNAL-IP “pending” problem.
+
+[root@ip-172-31-14-245 ~]# kubectl get svc -n istio-system
+NAME                   TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                                      AGE
+istio-ingressgateway   LoadBalancer   10.106.112.16   <pending>     15021:32441/TCP,80:30861/TCP,443:32762/TCP   44h
+istiod                 ClusterIP      10.96.34.192    <none>        15010/TCP,15012/TCP,443/TCP,15014/TCP        44h
+
+Step:-6
+==========
+MetalLB can solve the istio ingress gateway EXTERNAL-IP “pending” problem.
+Install
+
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.9.6/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.9.6/manifests/metallb.yaml
+# On first install only
+kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"
+
+Step:-7
+========
+Config
+
+$ kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 172.16.50.147-172.16.50.148 #Update this with your Nodes IP range
+EOF
+
+Step:-8
+======
+Demo
+Enable istio injection.
+
+$ kubectl label namespace default istio-injection=enabled
+namespace/default labeled
+
+Step:-9
+===========
+Deploy the sample applictaion
+----------------------
+Deploy book info demo.
+
+$ cd istio-1.9.2
+$ kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
+
+Step:-10
+============
+Deploy book info gateway.
+--------
+$ kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
+gateway.networking.istio.io/bookinfo-gateway created
+virtualservice.networking.istio.io/bookinfo created
+
+Step:-11
+=========
+Confirm that all of the pods are running with the following command.
+$ kubectl get pod
+NAME                              READY   STATUS    RESTARTS   AGE
+details-v1-79f774bdb9-62x6b       2/2     Running   0          19m
+productpage-v1-6b746f74dc-4g4hk   2/2     Running   0          19m
+ratings-v1-b6994bb9-rz6pq         2/2     Running   0          19m
+reviews-v1-545db77b95-bcnd8       2/2     Running   0          19m
+reviews-v2-7bf8c9648f-zcgfx       2/2     Running   0          19m
+reviews-v3-84779c7bbc-78bk7       2/2     Running   0          19m
+
+Step:-12
+=========
+Get istio ingress gateway EXTERNAL-IP.
+
+$ kubectl get service -n istio-system
+NAME                   TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)                                                                      AGE
+istio-ingressgateway   LoadBalancer   10.99.204.213   172.16.50.147   15021:32373/TCP,80:30588/TCP,443:31095/TCP,15012:31281/TCP,15443:32738/TCP   73m
+istiod                 ClusterIP      10.103.238.79   <none>          15010/TCP,15012/TCP,443/TCP,15014/TCP    
+
+Step:-13
+========
+Access productpage via http://EXTERNAL-IP/productpage

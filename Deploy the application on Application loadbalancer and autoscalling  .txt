@@ -1,0 +1,69 @@
+How to deploy the application using autoscaling and Loadbalancer
+
+
+Take the exsting application server
+
+Install the below application for testing
+
+#!/bin/bash
+yum install httpd -y
+service httpd start
+chkconfig httpd on
+mkdir /var/www/html/thulasi
+echo "Hi there..you reached to right backend ec2" > /var/www/html/thulasi/index.html
+echo "Configured successfully"
+
+#!/bin/bash
+yum install httpd -y
+service httpd start
+chkconfig httpd on
+mkdir /var/www/html/ramesh
+echo "Bye from ec2" >  /var/www/html/ramesh/index.html
+echo "Configured successfully"
+
+
+Step:- 1
+We need to create the AMis for the exsting server
+
+Step:-2
+
+Create the Target group 
+
+Step :-3 
+Create the loadbalancer and add the target group on LB listener
+
+Step:- 4
+Create the application rules on loadbalancer
+
+Step:-5
+Create the launch templates and attach the amis
+
+Step :- 6
+
+Create the Auto Scaling groups and select the  launch templates 
+
+Step:-7
+
+Attach the loadbalancer targetgroup on autoscaling groups
+
+Step:-8
+
+Add the required scaaling group capacity
+
+Step:-9
+
+Try to hit the loadbalancer DNS using application path
+
+Step:-10
+
+Check the output of the application
+
+Step :-11
+
+Once your work is completed delete the exsting setup
+
+1. delete the auto scaling 
+2. delete the lanch temaplte
+3. delete the ami'
+4. delete the loadbalancer
+5. delete the target group

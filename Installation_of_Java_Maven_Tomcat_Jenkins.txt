@@ -1,0 +1,72 @@
+##Documentation_For_JAVA_MAVEN_TOMCAT_JENKINS 
+
+We need lanuch ec2 server (t2.micro)
+
+ 1 Step - 1  [ Install java ]
+	1.Install java ====
+         amazon-linux-extras install java-openjdk11 -y
+		 sudo yum install java-11-amazon-corretto-headless
+        2.Validate Installation =====
+	 java --version
+export JAVA_HOME=/usr
+
+ 2 Step - 2 [ Install_Maven ]
+        3.Download Maven ====
+         wget https://archive.apache.org/dist/maven/maven-3/3.6.2/binaries/apache-maven-3.6.2-bin.zip
+	4.Extract Maven ====
+         unzip apache-maven-3.6.2-bin.zip
+	5.Remove zip file ====
+         rm -rf apache-maven-3.6.2-bin.zip
+         cd apache-maven-3.6.2/
+         cd bin/
+	6.Validate Maven ====
+         ./mvn --version
+	 cd /root
+	 vi .bashrc
+	7.set the enviromental varible in .bashrc_profile  ====
+	 export MAVEN_HOME=/opt/maven/apache-maven-3.6.2
+	 export M2_HOME=/opt/maven/apache-maven-3.6.2
+	 export M2=//opt/maven/apache-maven-3.6.2/bin
+	 export PATH=/opt/maven/apache-maven-3.6.2/bin:$PATH
+        8.Exit and login again check the mvn command outside bin folder====
+ 	 exit
+	 mvn 
+	 mvn --version
+ 
+3 Step - 3  [ Install_Tomcat ]
+	   cd /mnt/
+        9.Create folder ====
+	   mkdir tomcat
+	   cd tomcat/
+	10.Download tomcat-9.0.71 ====        
+	   wget https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.71/bin/apache-tomcat-9.0.71.zip
+	11.Extract tomcat-9.0.71 ====   
+	   unzip apache-tomcat-9.0.71.zip
+	12.Remove tomcat-9.0.71 zip ==== 
+	   rm -rf apache-tomcat-9.0.71.zip
+	   cd apache-tomcat-9.0.71/
+	   cd bin/
+	13. Change permission of startup.sh shutdown.sh catalina.sh ==== 
+	   chmod 777 startup.sh shutdown.sh catalina.sh
+	   cd bin/
+	14. Run startup.sh  ==== 
+	   ./startup.sh
+4 Step - 4  [ Install_Jenkins ]
+	15. Go inside the webapps folder of tomcat ==== 
+ 	  cd /mnt/tomcat/apache-tomcat-9.0.71/webapps
+	16. Download latest jenkins war file ==== 
+	  wget https://get.jenkins.io/war-stable/latest/jenkins.war   
+        17.Copy the <public ip>:8080/jenkins and Open port 8080 from AWS Console Inatsnace SG =>
+        18. cat /var/lib/jenkins/secrets/initialAdminPassword      ...... (Got jenkins Password)
+        19.Plugin install and login
+		
+		java -jar jenkins.war --httpPort=9090 (runn the command under webapps)
+ 
+ java -jar jenkins.war --ajp13Port=-1 --httpPort=9090
+ 
+ https://get.jenkins.io/war-stable/  (spefic version install on jenkins)
+ 
+ 
+ 
+ 
+ 

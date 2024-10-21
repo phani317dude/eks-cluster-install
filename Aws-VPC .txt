@@ -1,0 +1,82 @@
+Using to vpc provide the inter
+
+How to provide the internet connection on EC2 using awsVPC
+
+
+How to enable internet connectivity for AWS VPC with only a private subnet?
+-----------------------------
+Understanding CIDR
+– IPv4
+• A CIDR consists of two components • Base IP • Represents an IP contained in the range (XX.XX.XX.XX) • 
+Example: 10.0.0.0, 192.168.0.0, … • Subnet Mask • 
+Defines how many bits can change in the IP • 
+Example: /0, /24, /32 • 
+Can take two forms: • 
+/8 255.0.0.0 •
+ /16  255.255.0.0 • 
+ /24  255.255.255.0 • 
+ /32  255.255.255.255
+ 
+ =
+ Understanding CIDR – Little Exercise
+• 192.168.0.0/24 = … ?
+• 192.168.0.0 – 192.168.0.255 (256 IPs)
+• 192.168.0.0/16 = … ?
+• 192.168.0.0 – 192.168.255.255 (65,536 IPs)
+• 134.56.78.123/32 = … ?
+• Just 134.56.78.123
+• 0.0.0.0/0
+• All IPs!
+
+All new AWS accounts have a default VPC
+• New EC2 instances are launched into the default VPC if no subnet is
+specified
+• Default VPC has Internet connectivity and all EC2 instances inside it
+have public IPv4 addresses
+• We also get a public and a private IPv4 DNS names
+
+• VPC = Virtual Private Cloud
+• You can have multiple VPCs in an AWS region (max. 5 per region – soft limit)
+• Max. CIDR per VPC is 5, for each CIDR:
+• Min. size is /28 (16 IP addresses)
+• Max. size is /16 (65536 IP addresses)
+• Because VPC is private, only the Private IPv4 ranges are allowed:
+• 10.0.0.0 – 10.255.255.255 (10.0.0.0/8)
+• 172.16.0.0 – 172.31.255.255 (172.16.0.0/12)
+• 192.168.0.0 – 192.168.255.255 (192.168.0.0/16)
+
+Hand on
+
+1. create vpc
+Cidr range = 10.0.0.0/16
+
+2. Create 4 subnets
+----2 public subnet (1a,1b)
+
+cidr:- 10.0.0.0/24
+		10.0.1.0/24
+----2 Pravite Subnet (1a,1b)
+
+cidr :- 10.0.16.0/20
+		10.0.32.0/20
+3. now create the ec2 server and attach the public vpc
+
+4 Now check the internet connectivity (ssh)
+
+If we are getting connactivity issue, We need to all below steps
+5. Create internet gateway
+6. Attach the your vpc
+
+7. Create the Route tables
+------public route
+Allow public subnets 1a,1b
+------Pravate Route
+Allow pravate subnet 1a,1b
+
+8. Edit the Routes and allow the internetgateway
+you need to allow anyware 0.0.0.0/0
+
+9. Now check the connectivity and check the internet.
+
+=========================================
+

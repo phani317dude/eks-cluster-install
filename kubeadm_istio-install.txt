@@ -1,0 +1,82 @@
+Istio
+========
+curl -L https://istio.io/downloadIstio | sh -
+cd istio-1.9.2
+export PATH=$PWD/bin:$PATH
+
+Deploy the Istio operator
+========================
+istioctl operator init
+
+./istioctl install --set profile=demo
+Install Istio
+=====================
+kubectl create ns istio-system
+
+$ kubectl apply -f - <<EOF
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  namespace: istio-system
+  name: example-istiocontrolplane
+spec:
+  profile: default
+EOF
+
+=================================Confirm that all of the pods are running with the following command.======
+$ kubectl get pod -n istio-system -w
+
+MetalLB
+
+
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.9.6/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.9.6/manifests/metallb.yaml
+# On first install only
+kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"
+
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 172.16.50.147-172.16.50.148 #Update this with your Nodes IP range
+EOF
+
+
+Demo
+Enable istio injection.
+ kubectl label namespace default istio-injection=enabled
+namespace/default labeled
+
+
+
+cd istio-1.9.2
+$ kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
+============Deploy book info gateway.=================
+$ kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
+
+========Confirm that all of the pods are running with the following command.===
+$ kubectl get pod
+
+Get istio ingress gateway EXTERNAL-IP.==
+$ kubectl get service -n istio-system
+
+
+MetalLB
+
+Refernce:-
+https://makeoptim.com/en/service-mesh/kubeadm-kubernetes-istio-setup/
+
+bitnami/metallb-controller:0.9.6
+
+bitnami/metallb-speaker:0.9.6
+
+https://youtu.be/GEKy4uapJDo

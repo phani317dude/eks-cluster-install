@@ -1,0 +1,208 @@
+pipeline{
+    // Use stash and unstash if removing this
+    agent any
+
+    environment {
+    eks_cluster_name = "eksdemo" 
+    artifacts_dir = "${env.WORKSPACE}/artifacts"
+    aws_region = "${params.aws_region}"
+    job_root_dir="${env.WORKSPACE}"
+    }
+    
+    stages {
+
+    stage('Initialize workspace') {
+        steps {
+        // Make sure the directory is clean
+        dir("${artifacts_dir}") {
+            deleteDir()
+        }
+        sh(script: "mkdir -p ${artifacts_dir}", label: 'Create artifacts directory')
+        }
+    }
+    stage("SCM"){
+            steps{
+                checkout([$class: 'GitSCM', 
+                	branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, 
+                	extensions: [], 
+                	submoduleCfg: [], 
+                	userRemoteConfigs: [[url: 'https://github.com/cloudtechmasters/springboot-maven-course-micro-svc.git']]])
+            }
+        }
+        
+        stage('Generate kubeconfig for the cluster') {
+        steps {
+        script {
+            env.KUBECONFIG = "${artifacts_dir}/${eks_cluster_name}-kubeconfig"
+            sh 'chmod +x ${WORKSPACE}/generate_kubeconfig_eks.sh'
+        }
+        sh(script: '${WORKSPACE}/generate_kubeconfig_eks.sh', label: 'Generate kubeconfig file')
+        }
+    }
+        
+        stage('Get the cluster details') {
+        steps {
+        script {
+            sh '''kubectl get nodes
+ kubectl apply -f springboot-deployment.yml
+                '''
+        }
+        }
+    }
+        
+        
+        
+    }
+    
+    post {
+	    cleanup {
+	          cleanWs(cleanWhenFailure: false)
+	    }
+    }
+    
+    
+ }
+ 
+===============
+pipeline{
+    agent any
+    tools{
+        maven 'maven-3.8.6'
+    }
+    options {
+    buildDiscarder(logRotator(numToKeepStr: '5', artifactNumToKeepStr: '30'))
+  }
+    stages{
+        stage('get code from github'){
+            steps{
+                git branch: "${params.branch}", url: "${params.url}"
+            }
+        }
+        stage('build maven project'){
+            steps{
+                sh 'mvn clean package'
+            }
+        }
+        stage('sonarqube analysis'){
+            steps{
+                withSonarQubeEnv(installationName: 'sonar-9') {
+   sh "/tmp/sonar-scanner-4.7.0.2747-linux/bin/sonar-scanner   -Dsonar.projectKey=hellospringboot -Dsonar.projectName=hellospringboot -Dsonar.sourceEncoding=UTF-8 -Dsonar.sources=src"
+    }
+            }
+        }
+        stage("Quality Gate") {
+            steps {
+              timeout(time: 1, unit: 'HOURS') {
+                waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        
+    }
+}
+
+==============================
+
+pipeline 
+{
+   agent any
+
+   stages
+   {
+        stage('checkout') 
+        {
+         steps
+         {
+            echo 'cloning from bitbucket'    
+            checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '33ef7cc3-f2f0-41ae-9cdb-b51888b00f93', url: 'https://thulasikumar813@bitbucket.org/thulasikumar813/jankinsp2.git']]])
+         }
+        }
+stage ('sonar')
+{
+steps{
+echo 'SONAR CONFIGURATION'
+bat 'mvn sonar:sonar'
+}
+}
+      stage('clean')
+      {
+         steps 
+         {
+            echo 'cleaning'
+            bat 'mvn clean'
+         }
+        }
+         stage('build')
+      {
+         steps 
+         {
+            echo 'packaging'
+            bat 'mvn package'
+         }
+        }
+         stage('deploy')
+      {
+         steps 
+         {
+            echo 'deploying'
+            deploy adapters: [tomcat7(credentialsId: 'ff7df9fc-6757-48a7-8474-115a6eb3861a', path: '', url: 'http://localhost:9999')], contextPath: 'declrative', war: '*/.war'
+            bat 'mvn tomcat7:deploy'
+                    }
+      }
+   }  
+}
+
+=====================================
+pipeline {
+    agent any
+    environment {
+        registry = 'thulasinaidu/springboot-demo:v1'
+        registryCredentials = 'docker-credentials'
+        dockerimage=''
+    }
+    stages {
+        stage('scm') { 
+            steps{
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/Naresh240/springbootCICD-demo.git']]])
+                
+            }
+        }
+        stage('build artifact') {
+            steps {
+                sh 'mvn clean install'
+            }
+    }
+    stage('build image') {
+        steps {
+            script {
+            dockerImage = docker.build registry
+            
+        }
+    }
+    
+    }
+    stage ('docker push') {
+        steps {
+            script {
+                docker.withRegistry('',registryCredentials) {
+                    dockerImage.push()
+                }
+            }
+        }
+    }
+        stage ('deploy in k8s') {
+            steps {
+                script {
+                withCredentials([kubeconfigFile(credentialsId: 'kubernetes-credentials', variable: 'KUBECONFIG')]) {
+                    sh '''
+                        kubectl apply -f deployement.yml
+                        kubectl apply -f service.yml
+                       '''
+                
+            }
+            
+            }
+        }
+    }
+}
+}

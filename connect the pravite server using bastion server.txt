@@ -1,0 +1,32 @@
+How to connect the private ec2 server(Private subnet) using Bastion server (public subnet)
+
+Step-1 
+
+What is bastion server?
+allow the spefic servers to the connect
+
+Create the bastion server and allow the public subnet
+
+Step -2
+
+Create the appliction server using to private subnet
+
+Step -3 
+
+Allow the ssh port 22
+
+Step-4
+
+Try to connect the pravite server using bastion server
+
+Follow below steps to connect
+
+Login to bastion server
+
+Create the keypair
+
+use below command to connect
+
+ssh -i keypairname ec2-user@ip address
+
+0400

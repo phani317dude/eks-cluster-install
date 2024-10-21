@@ -1,0 +1,250 @@
+Kubeadm install
+
+Server Specs
+Cloud platform: AWS
+Instance type: m5.large
+Disk size: 100GB gp3
+
+
+Update System Packages
+Yum update -y
+
+
+===========
+step -1
+----------------Install kubeadm, kubelet and kubectl---------------
+
+[root@ip-172-31-28-146 ~]# cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
+> [kubernetes]
+> name=Kubernetes
+> baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+> enabled=1
+> gpgcheck=1
+> gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+> exclude=kubelet kubeadm kubectl
+> EOF
+
+Output
+=========
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+exclude=kubelet kubeadm kubectl
+
+Step=2
+--------------------Disable SELinux--------------
+
+# setenforce 0
+setenforce: SELinux is disabled
+
+Step=3
+--------------------
+
+# sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+
+Step=4
+---------------------------Install kubeadm, kubelet and kubectl--------------
+
+# yum install -y kubelet-1.25.0-0 kubeadm-1.25.0-0 kubectl-1.25.0-0 --disableexcludes=kubernetes
+
+Output
+===========
+Loaded plugins: extras_suggestions, langpacks, priorities, update-motd
+kubernetes                                                                                             | 1.4 kB  00:00:00
+kubernetes/x86_64/primary                                                                              | 131 kB  00:00:00
+kubernetes                       
+
+Step=5
+----------------------
+# systemctl enable --now kubelet
+
+Output
+===========
+Created symlink from /etc/systemd/system/multi-user.target.wants/kubelet.service to /usr/lib/systemd/system/kubelet.service.
+
+Step=6
+---------------------Forwarding IPv4 and letting iptables see bridged traffic--------
+
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+> overlay
+> br_netfilter
+> EOF
+
+Output
+===========
+overlay
+br_netfilter
+
+Step=7
+---------------------
+# modprobe overlay
+
+# modprobe br_netfilter
+
+Step=8
+----------------
+lsmod | egrep  "overlay|netfilter"
+
+Output
+===============
+br_netfilter           32768  0
+bridge                262144  1 br_netfilter
+overlay               159744  0
+
+Step=9
+--------------------------Set required system parameters---------------
+
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+> net.bridge.bridge-nf-call-iptables  = 1
+> net.bridge.bridge-nf-call-ip6tables = 1
+> net.ipv4.ip_forward                 = 1
+> EOF
+
+Output
+----------------
+
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+
+Step=10
+-------------
+sysctl --system
+
+Step=11
+-------------------Install containerd----------------------
+
+wget https://github.com/containerd/containerd/releases/download/v1.6.16/containerd-1.6.16-linux-amd64.tar.gz
+
+tar Cxzvf /usr/local containerd-1.6.16-linux-amd64.tar.gz
+wget https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+mkdir -p /usr/local/lib/systemd/system
+mv containerd.service /usr/local/lib/systemd/system/containerd.service
+systemctl daemon-reload
+systemctl enable --now containerd
+
+Step=12
+--------------Install runc-------------------
+# wget https://github.com/opencontainers/runc/releases/download/v1.1.7/runc.amd64
+# install -m 755 runc.amd64 /usr/local/sbin/runc
+
+Step=13
+=============Installing CNI plugins==================
+
+wget https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz
+mkdir -p /opt/cni/bin
+tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.3.0.tgz
+
+wget https://storage.googleapis.com/golang/getgo/installer_linux
+chmod +x ./installer_linux
+./installer_linux
+source ~/.bash_profile
+
+yum install git -y
+git clone https://github.com/Mirantis/cri-dockerd.git
+cd cri-dockerd
+mkdir bin
+go build -o bin/cri-dockerd
+mkdir -p /usr/local/bin
+install -o root -g root -m 0755 bin/cri-dockerd /usr/local/bin/cri-dockerd
+cp -a packaging/systemd/* /etc/systemd/system
+sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+systemctl daemon-reload
+systemctl enable cri-docker.service
+
+Step=14=====Only on masternode
+---------------Pull down required images=================
+kubeadm config images pull --v=5
+
+Step=15===Only on masternode
+-----------Initialize Control Plane=====================
+# kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=172.31.28.146
+
+Step=16
+--------------------Only on masternode=========
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Step=17
+----------------------Check Pods are running fine==============
+# kubectl get nodes
+NAME                            STATUS     ROLES           AGE   VERSION
+ip-172-31-28-146.ec2.internal   NotReady   control-plane   41s   v1.25.0
+
+kubectl get pods -A
+======
+The output should look like:
+
+NAMESPACE     NAME                                                    READY   STATUS    RESTARTS   AGE
+kube-system   coredns-565d847f94-8rp7r                                0/1     Pending   0          35s
+kube-system   coredns-565d847f94-bt4xs                                0/1     Pending   0          35s
+kube-system   etcd-ip-172-31-28-146.ec2.internal                      1/1     Running   1          49s
+kube-system   kube-apiserver-ip-172-31-28-146.ec2.internal            1/1     Running   1          50s
+kube-system   kube-controller-manager-ip-172-31-28-146.ec2.internal   1/1     Running   1          52s
+kube-system   kube-proxy-vgwg8                                        1/1     Running   0          35s
+kube-system   kube-scheduler-ip-172-31-28-146.ec2.internal            1/1     Running   1          50s
+
+Step=18---------Install Network Plugin-------------------
+
+-------------
+# curl https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml -O
+# curl https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/custom-resources.yaml -O
+
+cat custom-resources.yaml
+# This section includes base Calico installation configuration.
+# For more information, see: https://projectcalico.docs.tigera.io/master/reference/installation/api#operator.tigera.io/v1.Installation
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  # Configures Calico networking.
+  calicoNetwork:
+    # Note: The ipPools section cannot be modified post-install.
+    ipPools:
+    - blockSize: 26
+      cidr: 192.168.0.0/16
+      encapsulation: VXLANCrossSubnet
+      natOutgoing: Enabled
+      nodeSelector: all()
+
+Step=19
+======================Update the custom-resources.yaml CIDR config, use the --pod-network-cidr=10.244.0.0/16 instead of the default 192.168.0.0/16====
+
+# vi custom-resources.yaml
+
+
+Step=20
+-----------------------Install tigera operator=======Install calico custom resource==============
+# kubectl create -f tigera-operator.yaml
+# kubectl create -f custom-resources.yaml
+
+Congratulations! You’ve successfully built your K8s cluster!
+
+]# kubectl get nodes
+NAME                            STATUS   ROLES           AGE     VERSION
+ip-172-31-28-146.ec2.internal   Ready    control-plane   7m43s   v1.25.0
+]# kubectl get pods -A
+NAMESPACE          NAME                                                    READY   STATUS    RESTARTS   AGE
+calico-apiserver   calico-apiserver-54b469fb4b-7hppw                       1/1     Running   0          36s
+calico-apiserver   calico-apiserver-54b469fb4b-8q7hc                       1/1     Running   0          36s
+calico-system      calico-kube-controllers-85666c5b94-ndh98                1/1     Running   0          62s
+calico-system      calico-node-w8fhk                                       1/1     Running   0          62s
+calico-system      calico-typha-6cc545c944-m79wm                           1/1     Running   0          62s
+calico-system      csi-node-driver-t8k4t                                   2/2     Running   0          46s
+kube-system        coredns-565d847f94-8rp7r                                1/1     Running   0          7m29s
+kube-system        coredns-565d847f94-bt4xs                                1/1     Running   0          7m29s
+kube-system        etcd-ip-172-31-28-146.ec2.internal                      1/1     Running   1          7m43s
+kube-system        kube-apiserver-ip-172-31-28-146.ec2.internal            1/1     Running   1          7m44s
+kube-system        kube-controller-manager-ip-172-31-28-146.ec2.internal   1/1     Running   1          7m46s
+kube-system        kube-proxy-vgwg8                                        1/1     Running   0          7m29s
+kube-system        kube-scheduler-ip-172-31-28-146.ec2.internal            1/1     Running   1          7m44s
+tigera-operator    tigera-operator-6675dc47f4-cwgkr                        1/1     Running   0          95s
+
+Reference
+https://blog.devgenius.io/install-k8s-v1-25-on-amazon-linux-2-e2a717444736
+https://devopscube.com/setup-kubernetes-cluster-kubeadm/

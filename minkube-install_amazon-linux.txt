@@ -1,0 +1,245 @@
+
+
+Minikube Install amazon linux-
+
+Install docker on EC2(t2.medium )
+
+sudo yum install -y docker
+
+sudo systemctl enable --now docker
+
+sudo usermod -aG docker ec2-user
+
+newgrp docker
+
+sudo systemctl restart docker
+
+Install Kubectl
+
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+
+mv kubectl /bin/kubectl
+
+chmod a+x /bin/kubectl
+
+
+
+Install Minikube
+
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+
+sudo install minikube-linux-amd64 /usr/bin/minikube
+
+sudo yum install conntrack -y
+
+Install cri-dockerd
+
+yum install git -y
+
+git clone https://github.com/Mirantis/cri-dockerd.git
+
+# Run these commands as root
+wget https://storage.googleapis.com/golang/getgo/installer_linux
+
+chmod +x ./installer_linux
+
+./installer_linux
+
+source ~/.bash_profile
+
+cd cri-dockerd
+
+mkdir bin
+
+go build -o bin/cri-dockerd
+
+mkdir -p /usr/local/bin
+
+install -o root -g root -m 0755 bin/cri-dockerd /usr/local/bin/cri-dockerd
+
+cp -a packaging/systemd/* /etc/systemd/system
+
+sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+
+systemctl daemon-reload
+
+systemctl enable cri-docker.service
+
+Install CRICTL
+
+wget https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.26.0/crictl-v1.26.0-linux-amd64.tar.gz
+
+sudo tar zxvf crictl-v1.26.0-linux-amd64.tar.gz -C /usr/local/bin
+rm -f crictl-$VERSION-linux-amd64.tar.gz
+
+cat <<EOF | sudo tee /etc/crictl.yaml
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 2
+debug: false
+pull-image-on-create: false
+EOF
+
+minikube start --vm-driver=none
+
+minikube delete
+
+minikube start --force --alsologtostderr
+
+Deploysample application
+
+kubectl create deployment hello-node --image=k8s.gcr.io/echoserver:1.4
+
+kubectl expose deployment hello-node --type=NodePort --port=8080
+
+curl -v 3.83.123.125:32256
+
+minikube ip
+
+curl 172.31.50.87:32256
+
+============================
+Trobleshooting steps
+=======
+[root@ip-172-31-78-96 ~]# kubectl get events --field-selector involvedObject.name=ip-172-31-78-96.ec2.internal
+LAST SEEN   TYPE     REASON                    OBJECT                              MESSAGE
+13m         Normal   Starting                  node/ip-172-31-78-96.ec2.internal   Starting kubelet.
+13m         Normal   NodeHasSufficientMemory   node/ip-172-31-78-96.ec2.internal   Node ip-172-31-78-96.ec2.internal status is now: NodeHasSufficientMemory
+13m         Normal   NodeHasNoDiskPressure     node/ip-172-31-78-96.ec2.internal   Node ip-172-31-78-96.ec2.internal status is now: NodeHasNoDiskPressure
+13m         Normal   NodeHasSufficientPID      node/ip-172-31-78-96.ec2.internal   Node ip-172-31-78-96.ec2.internal status is now: NodeHasSufficientPID
+13m         Normal   NodeAllocatableEnforced   node/ip-172-31-78-96.ec2.internal   Updated Node Allocatable limit across pods
+12m         Normal   RegisteredNode            node/ip-172-31-78-96.ec2.internal   Node ip-172-31-78-96.ec2.internal event: Registered Node ip-172-31-78-96.ec2.internal in Controller
+12m         Normal   Starting                  node/ip-172-31-78-96.ec2.internal
+[root@ip-172-31-78-96 ~]#
+[root@ip-172-31-78-96 ~]# sudo systemctl restart kubelet
+[root@ip-172-31-78-96 ~]# cat /etc/cni/net.d/
+cat: /etc/cni/net.d/: Is a directory
+[root@ip-172-31-78-96 ~]# cd /etc/cni/net.d/
+[root@ip-172-31-78-96 net.d]# ll
+total 4
+-rw-r--r--. 1 root docker 457 Jun  7 17:18 1-k8s.conflist
+[root@ip-172-31-78-96 net.d]# cat /etc/cni/net.d/1-k8s.conflist
+
+{
+  "cniVersion": "0.3.1",
+  "name": "bridge",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "bridge",
+      "addIf": "true",
+      "isDefaultGateway": true,
+      "forceAddress": false,
+      "ipMasq": true,
+      "hairpinMode": true,
+      "ipam": {
+          "type": "host-local",
+          "subnet": "10.244.0.0/16"
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+          "portMappings": true
+      }
+    }
+  ]
+}
+[root@ip-172-31-78-96 net.d]# sudo journalctl -u calico-node
+-- No entries --
+[root@ip-172-31-78-96 net.d]# cd /var/log/flanneld.log
+-bash: cd: /var/log/flanneld.log: No such file or directory
+[root@ip-172-31-78-96 net.d]# cd
+[root@ip-172-31-78-96 ~]# cd /var/log/flanneld.log
+-bash: cd: /var/log/flanneld.log: No such file or directory
+[root@ip-172-31-78-96 ~]# sudo journalctl -u flanneld
+-- No entries --
+[root@ip-172-31-78-96 ~]# sudo journalctl -u weave
+-- No entries --
+[root@ip-172-31-78-96 ~]# sudo journalctl -u cilium
+-- No entries --
+[root@ip-172-31-78-96 ~]# sudo journalctl -u canal
+-- No entries --
+[root@ip-172-31-78-96 ~]# kubectl get pods -n kube-system
+NAME                                                   READY   STATUS    RESTARTS   AGE
+coredns-787d4945fb-xvdsj                               0/1     Pending   0          21m
+etcd-ip-172-31-78-96.ec2.internal                      1/1     Running   0          21m
+kube-apiserver-ip-172-31-78-96.ec2.internal            1/1     Running   0          21m
+kube-controller-manager-ip-172-31-78-96.ec2.internal   1/1     Running   0          21m
+kube-proxy-ph5g2                                       1/1     Running   0          21m
+kube-scheduler-ip-172-31-78-96.ec2.internal            1/1     Running   0          21m
+storage-provisioner                                    0/1     Pending   0          21m
+[root@ip-172-31-78-96 ~]# minikube start --network-plugin=cni^C
+[root@ip-172-31-78-96 ~]# kubectl get nods
+error: the server doesn't have a resource type "nods"
+[root@ip-172-31-78-96 ~]# kubectl get nodes
+NAME                           STATUS     ROLES           AGE   VERSION
+ip-172-31-78-96.ec2.internal   NotReady   control-plane   21m   v1.26.3
+[root@ip-172-31-78-96 ~]# minikube start --network-plugin=cni
+* minikube v1.30.1 on Amazon 2023 (xen/amd64)
+* Using the none driver based on existing profile
+* Starting control plane node minikube in cluster minikube
+* Updating the running none "minikube" bare metal machine ...
+* OS release is Amazon Linux 2023
+* Preparing Kubernetes v1.26.3 on Docker 20.10.23 ...
+  - kubelet.resolv-conf=/run/systemd/resolve/resolv.conf
+* Configuring bridge CNI (Container Networking Interface) ...
+* Configuring local host environment ...
+*
+! The 'none' driver is designed for experts who need to integrate with an existing VM
+* Most users should use the newer 'docker' driver instead, which does not require root!
+* For more information, see: https://minikube.sigs.k8s.io/docs/reference/drivers/none/
+*
+! kubectl and minikube configuration will be stored in /root
+! To use kubectl or minikube commands as your own user, you may need to relocate them. For example, to overwrite your own settings, run:
+*
+  - sudo mv /root/.kube /root/.minikube $HOME
+  - sudo chown -R $USER $HOME/.kube $HOME/.minikube
+*
+* This can also be done automatically by setting the env var CHANGE_MINIKUBE_NONE_USER=true
+* Verifying Kubernetes components...
+  - Using image gcr.io/k8s-minikube/storage-provisioner:v5
+* Enabled addons: default-storageclass, storage-provisioner
+* Done! kubectl is now configured to use "minikube" cluster and "default" namespace by default
+[root@ip-172-31-78-96 ~]# kubectl get pods -n kube-system
+NAME                                                   READY   STATUS    RESTARTS      AGE
+coredns-787d4945fb-xvdsj                               0/1     Pending   0             23m
+etcd-ip-172-31-78-96.ec2.internal                      1/1     Running   3 (30s ago)   23m
+kube-apiserver-ip-172-31-78-96.ec2.internal            1/1     Running   2 (41s ago)   23m
+kube-controller-manager-ip-172-31-78-96.ec2.internal   1/1     Running   2 (40s ago)   23m
+kube-proxy-ph5g2                                       1/1     Running   2 (30s ago)   23m
+kube-scheduler-ip-172-31-78-96.ec2.internal            1/1     Running   3 (30s ago)   23m
+storage-provisioner                                    0/1     Pending   0             23m
+[root@ip-172-31-78-96 ~]# kubectl get pods -n kube-system
+NAME                                                   READY   STATUS    RESTARTS      AGE
+coredns-787d4945fb-xvdsj                               0/1     Pending   0             23m
+etcd-ip-172-31-78-96.ec2.internal                      1/1     Running   3 (82s ago)   24m
+kube-apiserver-ip-172-31-78-96.ec2.internal            1/1     Running   2 (93s ago)   24m
+kube-controller-manager-ip-172-31-78-96.ec2.internal   1/1     Running   2 (92s ago)   24m
+kube-proxy-ph5g2                                       1/1     Running   2 (82s ago)   23m
+kube-scheduler-ip-172-31-78-96.ec2.internal            1/1     Running   3 (82s ago)   24m
+storage-provisioner                                    0/1     Pending   0             24m
+[root@ip-172-31-78-96 ~]# kubectl describe pod coredns-787d4945fb-xvdsj -n kube-system
+Name:                 coredn
+
+minikube start --network-plugin=cni
+   24  kubectl get pods -n kube-system
+   25  kubectl describe pod coredns-787d4945fb-xvdsj -n kube-system
+   26  kubectl describe pod storage-provisioner -n kube-system
+   27  minikube status
+   28  minikube logs
+   29  systemctl status docker
+   30  kubectl get node
+   31  minikube stop
+   32  minikube start
+   33  kubectl get nodes
+   34  minikube delete
+   35  minikube start --force --alsologtostderr
+   36  kubectl get nodes
+   37  kubectl get pods -A
+
+======
+minikube delete
+minikube start --force --alsologtostderr
+
+minikube start --network-plugin=cni

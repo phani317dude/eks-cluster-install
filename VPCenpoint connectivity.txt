@@ -1,0 +1,84 @@
+VPC Endpoints (AWS PrivateLink)
+
+ VPC endpoint enables creation of a private connection between VPC to supported AWS services and VPC endpoint services
+
+Every AWS service is publicly exposed
+(public URL)
+• VPC Endpoints (powered by AWS
+PrivateLink) allows you to connect to AWS
+services using a private network instead of
+using the public Internet
+• They’re redundant and scale horizontally
+• They remove the need of IGW, NATGW, …
+to access AWS Services
+• In case of issues:
+• Check DNS Setting Resolution in your VPC
+• Check Route Tables
+
+Types of Endpoints
+
+1 Interface Endpoints (powered by PrivateLink)
+• Provisions an ENI (private IP address) as an entry
+point (must attach a Security Group)
+• Supports most AWS services
+• $ per hour + $ per GB of data processed
+
+
+2 Gateway Endpoints
+• Provisions a gateway and must be used as a
+target in a route table (does not use security
+groups)
+• Supports both S3 and DynamoDB
+• Free
+
+Gateway or Interface Endpoint for S3?
+
+Cost: free for Gateway, $ for
+interface endpoint
+• Interface Endpoint is preferred
+access is required from onpremises (Site to Site VPN or
+Direct Connect), a different VPC
+or a different region
+
+Step -1
+
+Create the pravite ec2 server
+
+Step -2 
+
+Check the aws services connectivity
+
+ex:- aws s3 ls --region us-east-1
+telnet logs.us-east-1.amazonaws.com 443
+
+Step-3
+
+Create the iam role and allow the required permessions
+
+Step -4
+
+Go to vpc endpoint and create the endpoint
+Name
+Select the aws ec2 services
+
+com.amazonaws.us-east-1.logs
+
+Step :-5
+
+Select the VPC
+
+Step-6
+
+DNS name
+DNS record IP type
+
+Step -7
+
+Allow the subnets 
+
+Step-8
+
+Security groups
+
+
+

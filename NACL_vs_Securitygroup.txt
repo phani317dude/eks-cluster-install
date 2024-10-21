@@ -1,0 +1,130 @@
+NACL vs security group (Allow the proxy)Network Access Control List (NACL)
+------------
+NACL are like a firewall which control traffic from and to subnets
+One NACL per subnet, new subnets are assigned the Default NACL
+Default NACL
+Accepts everything inbound/outbound with the subnets it’s associated with
+Do NOT modify the Default NACL, instead create custom NACLs
+
+Default NACL for a VPC that supports IPv4
+
+
+Step -1
+
+Install any application your ec2
+
+ex:- 
+yum install httpd -y
+systemctl enable httpd
+systemctl start httpd
+
+echo "helloworld" >/var/www/index/index.html
+
+Go to security group and allow the 80 port 
+
+Step -2
+
+Go to vpc select the NACL section and try edit defalut NACL it inboundrules
+
+Step -3
+Edit the NACL inbound rules
+port :- 80
+select http
+allow 0.0.0.0/0
+Sorted first row
+
+Step -4
+
+Try to hit the browers
+
+Step -5
+Edit the inbound rules
+
+port :- 140
+select http
+allow 0.0.0.0/0
+Sorted first row
+
+Step -6
+
+Edit the outbound rules
+
+Deny the defalult NACL
+
+Step -7
+
+EC2 security group (stefulset)return trafic also allowd (if you try to connect outside application it will not work)
+
+check inbound rules allowd 80 port
+
+Step -8
+
+Delete the defalt outbound rules and try to check the your application (working)
+
+And also try to allow outside application  (not work)
+
+=================================================
+
+VPC peering
+------------------------------
+Deffrent region and deffart account
+
+one vpc to another vpc communtion
+
+We can try connacting to my defalut vpc to created vpc (Note :- you can try deffrent region or deffrecnt accout also)
+
+Step -1
+First check the connectivity heppned or not
+
+Try to lunch the insance defalut vpc
+
+check the connectivity using curl or telnet under your vpc ec2 server
+
+Step -2
+
+Create the vpc peering
+
+select created vpc 
+
+Select another VPC to peer with
+Account or region
+
+Step -3
+
+VPC ID (Accepter)
+
+ create the vpc
+ 
+Step -4
+
+Try to connect and check
+
+If still not connecting follow below steps
+
+Step -5
+
+GO to route tables and edit the route tables
+
+Select the public rouetable and edit the routes
+
+add the default vpc cidr rang
+add the peering connection id
+
+Try to coonect and check
+
+Step -6
+
+GO to route tables and edit the route tables
+
+Select the defalut routes and add the created vpc cidr rang
+add the peering connection id
+
+Try to coonect and  and check
+
+
+
+
+
+
+
+

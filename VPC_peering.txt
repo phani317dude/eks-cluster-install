@@ -1,0 +1,78 @@
+VPC peering
+------------------------------
+Deffrent region and deffart account
+
+one vpc to another vpc communtion
+
+We can try connacting to my defalut vpc to created vpc (Note :- you can try deffrent region or deffrecnt accoutalso)
+
+VPC Peering • Privately connect two VPCs using AWS’
+network
+• Make them behave as if they were in the
+same network
+• Must not have overlapping CIDRs •
+ VPC Peering connection is NOT transitive
+(must be established for each VPC that
+need to communicate with one another)
+• You must update route tables in each VPC’s
+subnets to ensure EC2 instances can
+communicate with each other
+
+VPC Peering – Good to know
+• You can create VPC Peering connection between VPCs in different AWS
+accounts/regions
+• You can reference a security group in a peered VPC (works cross
+accounts – same region)
+
+Step -1
+First check the connectivity heppned or not
+
+Try to lunch the insance defalut vpc
+onemore what ever your you own vpc
+
+check the connectivity using curl or telnet curl -kv ip:port
+
+Step -2
+
+Create the vpc peering
+
+select created vpc 
+
+Select another VPC to peer with
+Account or region
+
+Step -3
+
+VPC ID (Accepter)
+
+ select the default vpc
+ 
+Step -4
+
+Try to connect and check
+
+If still not connecting follow below steps
+
+Step -5
+
+GO to route tables and edit the route tables
+
+Select the public rouetable and edit the routes
+
+add the default vpc cidr rang
+add the peering connection id
+
+Try to coonect and check
+
+Step -6
+
+Try to connect and check
+
+If still not connecting follow below steps
+
+GO to route tables and edit the route tables
+
+Select the defalut routes and add the created vpc cidr rang
+add the peering connection id
+
+Try to coonect and  and check

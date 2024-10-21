@@ -1,0 +1,42 @@
+IStio-install on eks
+
+An ingress Gateway describes a load balancer operating at the edge of the mesh that receives incoming HTTP/TCP connections. It configures exposed ports, protocols, etc. but, unlike Kubernetes Ingress Resources , does not include any traffic routing configuration
+
+curl -L https://istio.io/downloadIstio | sh -
+
+istioctl x precheck
+
+cd istio-1.13.3/
+
+cd bin/
+
+./istioctl version
+
+export PATH=$PWD/bin:$PATH
+
+./istioctl install --set profile=demo
+
+kubectl get svc
+
+kubectl get pods -A
+
+kubectl get crd
+
+==============================================================
+Istio Upgrade steps follow one by one
+
+https://istio.io/latest/docs/setup/upgrade/in-place/  istio upgarde doc
+==========================================
+Download the new version
+wget https://github.com/istio/istio/releases/download/1.16.0/istio-1.16.0-linux-amd64.tar.gz
+cd istio-1.16.0/
+cd bin/
+kubectl config view
+./istioctl x precheck
+./istioctl upgrade
+kubectl get pods -n istio-system
+kubectl get svc -n istio-system
+./istioctl proxy-status
+./istioctl version
+==========================================================
+https://istio.io/latest/docs/setup/upgrade/in-place/
